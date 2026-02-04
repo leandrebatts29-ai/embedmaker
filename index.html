@@ -3,52 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instant Site Embedder</title>
+    <title>Secure Web Embedder</title>
     <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --sidebar: #ffffff;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             margin: 0;
             display: flex;
-            flex-direction: column;
             height: 100vh;
-            background-color: #f4f4f9;
+            background-color: var(--bg);
+            overflow: hidden;
+        }
+        /* Sidebar Styles */
+        #sidebar {
+            width: 260px;
+            background: var(--sidebar);
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            flex-shrink: 0;
+        }
+        h3 { font-size: 14px; text-transform: uppercase; color: #64748b; margin-top: 20px; }
+        #history-list { list-style: none; padding: 0; overflow-y: auto; }
+        .history-item {
+            padding: 8px 12px;
+            background: #f1f5f9;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .history-item:hover { background: #e2e8f0; }
+
+        /* Main Area Styles */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
         .header {
             padding: 15px;
             background: #fff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-bottom: 1px solid #e2e8f0;
             display: flex;
             gap: 10px;
-            z-index: 10;
         }
         input {
             flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
+            padding: 10px 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            outline: none;
         }
+        input:focus { border-color: var(--primary); }
         button {
             padding: 10px 20px;
-            background-color: #007bff;
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
         }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #embed-container {
+        #embed-viewport {
             flex-grow: 1;
             border: none;
-            width: 100%;
-            background: #ddd;
+            background: #fff;
         }
-        .error-msg {
-            font-size: 12px;
-            color: #666;
+        .info-bar {
+            font-size: 11px;
+            color: #94a3b8;
             padding: 5px 15px;
             background: #fff;
         }
@@ -56,38 +88,83 @@
 </head>
 <body>
 
-    <div class="header">
-        <input type="text" id="urlInput" placeholder="Enter URL (e.g., https://wikipedia.org)">
-        <button onclick="loadSite()">Embed Link</button>
-    </div>
-    <div class="error-msg">
-        Note: Some sites (Google, Facebook, etc.) block embedding for security. Ensure your link starts with <b>https://</b>. Also, if you're using this for blockn't purposes, because we both know why this really exists, if the blocked window pops up, just press the embed button again until it does work, it can take a bit but it'll get there!
+    <div id="sidebar">
+        <h2>Embedder</h2>
+        <h3>Recent History</h3>
+        <div id="history-list"></div>
+        <button onclick="clearHistory()" style="margin-top:auto; background:#ef4444; font-size: 12px;">Clear History</button>
     </div>
 
-    <iframe id="embed-container" src="about:blank"></iframe>
+    <div class="main-content">
+        <div class="header">
+            <input type="text" id="urlInput" placeholder="Enter URL (e.g., wikipedia.org)">
+            <button onclick="loadSite()">Embed</button>
+        </div>
+        <div class="info-bar">
+            Security Active: <b>Sandbox Mode</b> | <b>No-Referrer Policy</b>
+        </div>
+        <iframe 
+            id="embed-viewport" 
+            src="about:blank" 
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups" 
+            referrerpolicy="no-referrer">
+        </iframe>
+    </div>
 
     <script>
-        function loadSite() {
-            const urlInput = document.getElementById('urlInput').value;
-            const iframe = document.getElementById('embed-container');
-            
-            if (urlInput.trim() !== "") {
-                // Ensure the URL has a protocol
-                let targetUrl = urlInput;
-                if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-                    targetUrl = 'https://' + targetUrl;
-                }
-                iframe.src = targetUrl;
-            } else {
-                alert("Please enter a valid URL.");
+        const urlInput = document.getElementById('urlInput');
+        const iframe = document.getElementById('embed-viewport');
+        const historyList = document.getElementById('history-list');
+
+        // Load history from local storage on startup
+        let history = JSON.parse(localStorage.getItem('embedHistory')) || [];
+        renderHistory();
+
+        function loadSite(customUrl = null) {
+            let url = customUrl || urlInput.value.trim();
+            if (!url) return;
+
+            // Ensure URL format
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            iframe.src = url;
+
+            if (!customUrl) {
+                saveToHistory(url);
             }
         }
 
-        // Allow pressing "Enter" to trigger the button
-        document.getElementById("urlInput").addEventListener("keypress", function(event) {
-            if (event.key === "Enter") {
-                loadSite();
+        function saveToHistory(url) {
+            if (!history.includes(url)) {
+                history.unshift(url);
+                if (history.length > 10) history.pop(); // Keep last 10
+                localStorage.setItem('embedHistory', JSON.stringify(history));
+                renderHistory();
             }
+        }
+
+        function renderHistory() {
+            historyList.innerHTML = '';
+            history.forEach(url => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerText = url.replace('https://', '');
+                div.onclick = () => loadSite(url);
+                historyList.appendChild(div);
+            });
+        }
+
+        function clearHistory() {
+            history = [];
+            localStorage.removeItem('embedHistory');
+            renderHistory();
+        }
+
+        // Enter key support
+        urlInput.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") loadSite();
         });
     </script>
 </body>
