@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site Embedder</title>
+    <title>Secure Web Embedder</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -18,7 +18,6 @@
             background-color: var(--bg);
             overflow: hidden;
         }
-        /* Sidebar Styles */
         #sidebar {
             width: 260px;
             background: var(--sidebar);
@@ -27,6 +26,7 @@
             flex-direction: column;
             padding: 15px;
             flex-shrink: 0;
+            transition: 0.3s;
         }
         h3 { font-size: 14px; text-transform: uppercase; color: #64748b; margin-top: 20px; }
         #history-list { list-style: none; padding: 0; overflow-y: auto; }
@@ -43,7 +43,6 @@
         }
         .history-item:hover { background: #e2e8f0; }
 
-        /* Main Area Styles */
         .main-content {
             flex-grow: 1;
             display: flex;
@@ -63,7 +62,6 @@
             border-radius: 8px;
             outline: none;
         }
-        input:focus { border-color: var(--primary); }
         button {
             padding: 10px 20px;
             background: var(--primary);
@@ -73,10 +71,20 @@
             cursor: pointer;
             font-weight: 600;
         }
+        .btn-secondary {
+            background: #64748b;
+        }
         #embed-viewport {
             flex-grow: 1;
             border: none;
             background: #fff;
+            width: 100%;
+            height: 100%;
+        }
+        /* Style for when the iframe itself goes fullscreen */
+        #embed-viewport:fullscreen {
+            width: 100vw;
+            height: 100vh;
         }
         .note-area {
             font-size: 12px;
@@ -84,17 +92,6 @@
             padding: 10px 15px;
             background: #fefce8;
             border-bottom: 1px solid #e2e8f0;
-            line-height: 1.4;
-        }
-        .security-badge {
-            display: inline-block;
-            background: #dcfce7;
-            color: #166534;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: bold;
-            font-size: 10px;
-            margin-right: 5px;
         }
     </style>
 </head>
@@ -111,19 +108,20 @@
         <div class="header">
             <input type="text" id="urlInput" placeholder="Enter URL (e.g., wikipedia.org)">
             <button onclick="loadSite()">Embed</button>
+            <button class="btn-secondary" onclick="toggleFullscreen()">Fullscreen</button>
         </div>
         
         <div class="note-area">
-            <span class="security-badge">NOTE</span>
-            Some sites, such as Facebook, Google, and YouTube won't work as they block embedding. Also, if you're using this for blockn't purposes, then
-            if the sites show up as blocked, then just try again, it'll probably take a few, especially if it's a .com site, also some .com sites just won't blockn't. Thanks :)
+            <b>Note:</b> Some sites block embedding via 'X-Frame-Options'. 
+            If it stays blank, the destination site is blocking the connection.
         </div>
 
         <iframe 
             id="embed-viewport" 
             src="about:blank" 
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups" 
-            referrerpolicy="no-referrer">
+            referrerpolicy="no-referrer"
+            allowfullscreen>
         </iframe>
     </div>
 
@@ -138,15 +136,20 @@
         function loadSite(customUrl = null) {
             let url = customUrl || urlInput.value.trim();
             if (!url) return;
-
-            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'https://' + url;
-            }
+            if (!url.startsWith('http')) url = 'https://' + url;
 
             iframe.src = url;
+            if (!customUrl) saveToHistory(url);
+        }
 
-            if (!customUrl) {
-                saveToHistory(url);
+        // --- NEW FULLSCREEN FUNCTION ---
+        function toggleFullscreen() {
+            if (iframe.requestFullscreen) {
+                iframe.requestFullscreen();
+            } else if (iframe.webkitRequestFullscreen) { /* Safari */
+                iframe.webkitRequestFullscreen();
+            } else if (iframe.msRequestFullscreen) { /* IE11 */
+                iframe.msRequestFullscreen();
             }
         }
 
@@ -164,7 +167,7 @@
             history.forEach(url => {
                 const div = document.createElement('div');
                 div.className = 'history-item';
-                div.innerText = url.replace('https://', '');
+                div.innerText = url.replace('https://', '').replace('http://', '');
                 div.onclick = () => loadSite(url);
                 historyList.appendChild(div);
             });
@@ -176,9 +179,7 @@
             renderHistory();
         }
 
-        urlInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") loadSite();
-        });
+        urlInput.addEventListener("keypress", (e) => { if (e.key === "Enter") loadSite(); });
     </script>
 </body>
 </html>
